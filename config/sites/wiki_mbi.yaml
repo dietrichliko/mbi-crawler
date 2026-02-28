@@ -1,0 +1,57 @@
+# Marietta Blau Institute internal WikiJS — private network, requires OEAW SSO login.
+#
+# Prerequisites:
+#   1. Run on a machine that can reach wiki.mbi.oeaw.ac.at (MBI network or VPN).
+#   2. Copy .env.example to .env and fill in WIKI_USERNAME / WIKI_PASSWORD.
+#   3. Set enabled: true below.
+#
+# The variable names below tell the crawler which keys to read from .env.
+# The actual secrets never appear in this file.
+#
+# The crawler performs a browser-based SSO login, then BFS-crawls internal links.
+# If the login form selectors change (SSO redesign), update auth.* fields here.
+
+name: wiki_mbi
+enabled: false          # disabled by default — requires private network + credentials
+crawler_type: wikijs
+base_url: https://wiki.mbi.oeaw.ac.at
+
+start_urls:
+  - https://wiki.mbi.oeaw.ac.at
+
+auth:
+  type: sso
+  # The wiki redirects to the OEAW identity provider on first access.
+  login_url: https://wiki.mbi.oeaw.ac.at
+  # Names of the keys to look up in .env (not the secrets themselves).
+  username_env: WIKI_USERNAME
+  password_env: WIKI_PASSWORD
+  # CSS selectors for the SSO login form (adjust if IdP changes).
+  username_selector: "input[name='email'], input[type='email'], input[id='username']"
+  password_selector: "input[type='password']"
+  submit_selector: "button[type='submit']"
+  # Substring that must appear in the URL after a successful login.
+  post_login_url_pattern: "wiki.mbi.oeaw.ac.at"
+
+filters:
+  max_depth: 5
+  same_domain_only: true
+  strip_query_params: true
+  include_patterns: []
+  exclude_patterns:
+    - "*/login*"
+    - "*/logout*"
+    - "*/_edit*"
+    - "*/_history*"
+
+rate_limit:
+  delay: 1.0
+  max_concurrent: 2
+
+output_subdir: wiki_mbi
+
+extra:
+  # WikiJS exposes a GraphQL API at /graphql that can enumerate all pages
+  # without link-following.  Future improvement: query it after login for
+  # a complete page list, then crawl each individually.
+  graphql_endpoint: https://wiki.mbi.oeaw.ac.at/graphql

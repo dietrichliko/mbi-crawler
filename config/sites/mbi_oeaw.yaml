@@ -1,0 +1,34 @@
+# MBI subsite of the Austrian Academy of Sciences.
+# Uses the oeaw.ac.at sitemap to discover URLs, then filters to /mbi/ paths.
+
+name: mbi_oeaw
+enabled: true
+crawler_type: oeaw
+base_url: https://www.oeaw.ac.at/mbi
+
+# Full sitemap of the parent site; OEAW crawler will filter it down to MBI pages.
+sitemap_url: https://www.oeaw.ac.at/sitemap.xml
+
+filters:
+  # Restrict to MBI subpath (full URL match via fnmatch).
+  include_patterns:
+    - "https://www.oeaw.ac.at/mbi*"
+  # Skip WordPress infrastructure paths.
+  exclude_patterns:
+    - "*/wp-json/*"
+    - "*/feed/*"
+    - "*/wp-admin/*"
+    - "*?*"           # URLs with query strings (after fnmatch, ? = one char wildcard — handled by strip_query_params below)
+  strip_query_params: true
+  max_depth: 10
+
+rate_limit:
+  delay: 1.5          # seconds between requests per concurrent slot
+  max_concurrent: 2
+
+output_subdir: mbi_oeaw
+
+extra:
+  # Notes for manual tuning:
+  # - If oeaw.ac.at adds sitemap sub-indexes, they are followed automatically.
+  # - Set include_patterns to [] to crawl the entire oeaw.ac.at (slow).

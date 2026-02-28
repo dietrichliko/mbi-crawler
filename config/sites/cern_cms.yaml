@@ -1,0 +1,36 @@
+# CERN CMS WorkBook — public TWiki site.
+# Crawls the CMSPublic namespace starting from the WorkBook entry point.
+# Depth-limited so it does not sprawl into unrelated TWiki webs.
+
+name: cern_cms
+enabled: true
+crawler_type: twiki
+base_url: https://twiki.cern.ch/twiki/bin/view/CMSPublic/WorkBook
+
+start_urls:
+  - https://twiki.cern.ch/twiki/bin/view/CMSPublic/WorkBook
+
+filters:
+  # Only follow links within the CMSPublic TWiki web.
+  # The twiki crawler enforces the namespace prefix automatically;
+  # these patterns add an extra safety net.
+  include_patterns: []
+  exclude_patterns:
+    - "*/bin/edit/*"
+    - "*/bin/attach/*"
+    - "*/bin/rdiff/*"
+    - "*/bin/oops/*"
+    - "*/bin/search/*"
+  max_depth: 4
+  strip_query_params: true
+
+rate_limit:
+  delay: 2.0            # be polite to CERN servers
+  max_concurrent: 1     # single-threaded to avoid triggering rate limits
+
+output_subdir: cern_cms
+
+extra:
+  # TWiki namespace to stay within (derived automatically from start_url,
+  # but can be overridden here if you want to include multiple webs).
+  twiki_namespace: CMSPublic

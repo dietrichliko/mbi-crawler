@@ -1,0 +1,26 @@
+# Python build artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Secrets — never bake these into the image
+.env
+*.env
+!.env.example
+
+# Crawl output (large, regeneratable)
+output/
+
+# Dev / CI tooling
+.git/
+.github/
+.pre-commit-config.yaml
+tests/
+
+# Docs (not needed at runtime)
+CHANGELOG.md
+CLAUDE.md
+scripts/

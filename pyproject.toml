@@ -1,0 +1,59 @@
+[project]
+name = "mbi-crawler"
+version = "0.1.0"
+description = "RAG crawler for the Marietta Blau Institute (MBI/OEAW), WikiJS, and CERN TWiki sites"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Dietrich Liko", email = "Dietrich.Liko@oeaw.ac.at" },
+    { name = "Claude Sonnet", email = "noreply@anthropic.com" },
+]
+dependencies = [
+    "crawl4ai>=0.4",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "httpx>=0.27",
+    "rich>=13.0",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+mbi-crawler = "mbi_crawler.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mbi_crawler"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "mypy>=1.10",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "types-pyyaml>=6.0",
+    "git-cliff>=2.0",      # changelog generation (ships the git-cliff binary)
+    "pre-commit>=4.0",     # git hook management
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = [
+    "B008",   # do not perform function calls in argument defaults
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

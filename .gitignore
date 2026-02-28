@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# uv
+uv.lock
+
+# Crawler output (large, regeneratable)
+output/
+
+# Environment / secrets
+.env
+*.env
+
+# Playwright
+.playwright/
+
+# Mypy cache
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# macOS
+.DS_Store
+
+# crawl4ai cache
+.crawl4ai/

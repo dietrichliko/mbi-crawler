@@ -1,0 +1,6 @@
+# Global crawler settings.
+# Per-site configs live in config/sites/*.yaml and are merged automatically.
+
+output_base_dir: ./output
+respect_robots_txt: true
+headless: true

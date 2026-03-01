@@ -57,9 +57,11 @@ python3 - <<PYEOF
 import re, pathlib
 p = pathlib.Path("pyproject.toml")
 old = p.read_text()
-new = re.sub(r'^version = ".*"', f'version = "${VERSION}"', old, flags=re.MULTILINE)
-if old == new:
+if not re.search(r'^version = ".*"', old, flags=re.MULTILINE):
     raise SystemExit("Could not find 'version = ...' in pyproject.toml")
+new = re.sub(r'^version = ".*"', f'version = "${VERSION}"', old, flags=re.MULTILINE)
+if not new.endswith("\n"):
+    new += "\n"
 p.write_text(new)
 PYEOF
 
@@ -68,6 +70,8 @@ echo "  ✓ pyproject.toml  →  version = \"${VERSION}\""
 # ── 2. Regenerate full CHANGELOG.md ──────────────────────────────────────────
 
 uv run git-cliff --tag "${TAG}" --output CHANGELOG.md
+# Ensure trailing newline
+[ -n "$(tail -c1 CHANGELOG.md)" ] && echo >> CHANGELOG.md
 
 echo "  ✓ CHANGELOG.md updated"
 echo

@@ -33,8 +33,21 @@ logger = logging.getLogger(__name__)
 
 # TWiki action path segments that do NOT represent readable content pages.
 _SKIP_ACTIONS = frozenset(
-    ["edit", "attach", "rdiff", "diff", "oops", "search", "manage",
-     "rename", "preview", "rest", "login", "logon", "viewfile"]
+    [
+        "edit",
+        "attach",
+        "rdiff",
+        "diff",
+        "oops",
+        "search",
+        "manage",
+        "rename",
+        "preview",
+        "rest",
+        "login",
+        "logon",
+        "viewfile",
+    ]
 )
 
 
@@ -94,7 +107,8 @@ class TWikiCrawler(BaseCrawler):
         discovered.sort()
         logger.info(
             "[%s] Discovered %d TWiki pages from WebTopicList",
-            self.site_config.name, len(discovered),
+            self.site_config.name,
+            len(discovered),
         )
         return discovered
 
@@ -102,9 +116,7 @@ class TWikiCrawler(BaseCrawler):
     # Content fetch — ?skin=text strips navigation/boilerplate
     # ------------------------------------------------------------------
 
-    async def crawl_page(
-        self, crawler: AsyncWebCrawler, url: str
-    ) -> PageResult | None:
+    async def crawl_page(self, crawler: AsyncWebCrawler, url: str) -> PageResult | None:
         """Fetch *url* with ``?skin=text`` for clean, boilerplate-free content."""
         if url in self._visited:
             return None

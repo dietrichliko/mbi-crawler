@@ -6,11 +6,15 @@ from mbi_crawler.output.writer import url_to_path
 
 
 def test_root_becomes_index() -> None:
-    assert url_to_path("https://www.oeaw.ac.at/mbi", "https://www.oeaw.ac.at/mbi") == Path("index.md")
+    assert url_to_path("https://www.oeaw.ac.at/mbi", "https://www.oeaw.ac.at/mbi") == Path(
+        "index.md"
+    )
 
 
 def test_trailing_slash_index() -> None:
-    assert url_to_path("https://www.oeaw.ac.at/mbi/research/", "https://www.oeaw.ac.at/mbi") == Path("research/index.md")
+    assert url_to_path(
+        "https://www.oeaw.ac.at/mbi/research/", "https://www.oeaw.ac.at/mbi"
+    ) == Path("research/index.md")
 
 
 def test_deep_path() -> None:

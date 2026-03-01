@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
@@ -18,7 +17,7 @@ from .crawlers.wikijs import WikiJSCrawler
 
 app = typer.Typer(
     name="mbi-crawler",
-    help="Crawl Marietta Blau Institute (MBI/OEAW), WikiJS, and CERN TWiki sites into Markdown for RAG.",
+    help="Crawl Marietta Blau Institute (MBI/OEAW), WikiJS, and CERN TWiki sites into Markdown for RAG.",  # noqa: E501
     add_completion=False,
 )
 
@@ -46,9 +45,9 @@ def _setup_logging(verbose: bool) -> None:
 @app.command()
 def crawl(
     config: Path = typer.Option(_DEFAULT_SETTINGS, help="Path to settings YAML."),
-    sites_dir: Optional[Path] = typer.Option(_DEFAULT_SITES_DIR, help="Per-site YAML directory."),
+    sites_dir: Path | None = typer.Option(_DEFAULT_SITES_DIR, help="Per-site YAML directory."),
     env_file: Path = typer.Option(_DEFAULT_ENV_FILE, help="Path to .env file with secrets."),
-    site: Optional[list[str]] = typer.Option(
+    site: list[str] | None = typer.Option(
         None, "--site", "-s", help="Site key(s) to crawl.  Repeatable.  Default: all enabled."
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug logging."),
@@ -78,7 +77,9 @@ def crawl(
         for name, site_cfg in targets.items():
             cls = _CRAWLER_MAP.get(site_cfg.crawler_type)
             if cls is None:
-                logging.warning("Unknown crawler_type '%s' for site '%s'", site_cfg.crawler_type, name)
+                logging.warning(
+                    "Unknown crawler_type '%s' for site '%s'", site_cfg.crawler_type, name
+                )
                 continue
             logging.info("Starting crawl: [bold]%s[/bold]", name)
             crawler = cls(site_cfg, app_config)
@@ -90,7 +91,7 @@ def crawl(
 @app.command(name="list-sites")
 def list_sites(
     config: Path = typer.Option(_DEFAULT_SETTINGS),
-    sites_dir: Optional[Path] = typer.Option(_DEFAULT_SITES_DIR),
+    sites_dir: Path | None = typer.Option(_DEFAULT_SITES_DIR),
 ) -> None:
     """List all configured sites and their status."""
     _setup_logging(verbose=False)

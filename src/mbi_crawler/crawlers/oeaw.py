@@ -19,9 +19,8 @@ from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree as ET
 
 import httpx
-from crawl4ai import AsyncWebCrawler  # type: ignore[import]
+from crawl4ai import AsyncWebCrawler
 
-from ..config.models import SiteConfig, AppConfig
 from .base import BaseCrawler
 
 logger = logging.getLogger(__name__)
@@ -50,7 +49,9 @@ class OEAWCrawler(BaseCrawler):
             await self.setup(crawler)
             urls = await self.discover_urls(crawler)
             logger.info("[%s] Discovered %d URLs", self.site_config.name, len(urls))
-            logger.info("[%s] Found %d EN alternates", self.site_config.name, len(self._en_alternates))
+            logger.info(
+                "[%s] Found %d EN alternates", self.site_config.name, len(self._en_alternates)
+            )
 
             async def _fetch_de(url: str) -> None:
                 async with sem:
@@ -66,15 +67,11 @@ class OEAWCrawler(BaseCrawler):
                 async with sem:
                     page = await self.crawl_page(crawler, en_url)
                     if page:
-                        out = self.writer.write(
-                            page, self.site_config, lang="en", path_url=de_url
-                        )
+                        out = self.writer.write(page, self.site_config, lang="en", path_url=de_url)
                         logger.debug("Wrote EN %s → %s", en_url, out)
                 await asyncio.sleep(rate.delay)
 
-            await asyncio.gather(
-                *[_fetch_en(de, en) for de, en in self._en_alternates.items()]
-            )
+            await asyncio.gather(*[_fetch_en(de, en) for de, en in self._en_alternates.items()])
 
         manifest = self.writer.write_manifest(self.site_config)
         logger.info(
@@ -91,7 +88,9 @@ class OEAWCrawler(BaseCrawler):
             filtered = self._filter(raw)
             if filtered:
                 return filtered
-            logger.info("[%s] Sitemap had no matching URLs — falling back to BFS", self.site_config.name)
+            logger.info(
+                "[%s] Sitemap had no matching URLs — falling back to BFS", self.site_config.name
+            )
 
         return await self._bfs_discover(crawler)
 
@@ -124,10 +123,10 @@ class OEAWCrawler(BaseCrawler):
             async with sem:
                 result = await crawler.arun(url=url, config=self.make_discovery_config())
             await asyncio.sleep(rate.delay)
-            if not result.success:
+            if not result.success:  # pyright: ignore[reportAttributeAccessIssue]
                 return []
             # Capture the EN language-switcher alternate for this DE page.
-            for link in result.links.get("internal", []):
+            for link in result.links.get("internal", []):  # pyright: ignore[reportAttributeAccessIssue]
                 if (
                     link.get("text", "").strip() == "EN"
                     and "select your language" in link.get("title", "").lower()
@@ -137,7 +136,7 @@ class OEAWCrawler(BaseCrawler):
                         self._en_alternates[url] = en_norm
                     break
             links: list[str] = []
-            for link in result.links.get("internal", []):
+            for link in result.links.get("internal", []):  # pyright: ignore[reportAttributeAccessIssue]
                 href = (link.get("href") or "").strip()
                 if not href:
                     continue
@@ -169,7 +168,9 @@ class OEAWCrawler(BaseCrawler):
                         next_frontier.append(link)
             logger.debug(
                 "[%s] BFS depth %d → %d new pages",
-                self.site_config.name, depth + 1, len(next_frontier),
+                self.site_config.name,
+                depth + 1,
+                len(next_frontier),
             )
             frontier = next_frontier
 
@@ -243,9 +244,10 @@ class OEAWCrawler(BaseCrawler):
             path = parsed.path
 
             # Include filter — match against full URL.
-            if filters.include_patterns:
-                if not any(fnmatch.fnmatch(url, p) for p in filters.include_patterns):
-                    continue
+            if filters.include_patterns and not any(
+                fnmatch.fnmatch(url, p) for p in filters.include_patterns
+            ):
+                continue
 
             # Exclude filter — match against path (simpler patterns in YAML).
             if any(fnmatch.fnmatch(path, p) for p in filters.exclude_patterns):

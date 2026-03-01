@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig  # type: ignore[import]
+from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 
 from ..config.models import AppConfig, SiteConfig
 from ..output.models import PageResult
@@ -81,8 +81,10 @@ class BaseCrawler(ABC):
     # Optional hooks
     # ------------------------------------------------------------------
 
-    async def setup(self, crawler: AsyncWebCrawler) -> None:
+    @abstractmethod
+    async def setup(self, crawler: Any) -> None:
         """Called once before discovery.  Override for login flows etc."""
+        ...
 
     # ------------------------------------------------------------------
     # Core page-fetch

@@ -32,6 +32,7 @@ to enumerate all pages without link-following.  Enable this by setting
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -92,15 +93,46 @@ _DOM_CLEANUP_JS = r"""
 """
 
 # File extensions that cannot be rendered by Playwright — downloaded via httpx.
-_BINARY_EXTENSIONS = frozenset({
-    ".pdf", ".pptx", ".ppt", ".potx", ".pot",
-    ".docx", ".doc", ".dotx", ".dot",
-    ".xlsx", ".xls", ".xltx", ".xlt",
-    ".odt", ".ods", ".odp", ".odg",
-    ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
-    ".mp4", ".mp3", ".avi", ".mov", ".mkv", ".webm",
-})
+_BINARY_EXTENSIONS = frozenset(
+    {
+        ".pdf",
+        ".pptx",
+        ".ppt",
+        ".potx",
+        ".pot",
+        ".docx",
+        ".doc",
+        ".dotx",
+        ".dot",
+        ".xlsx",
+        ".xls",
+        ".xltx",
+        ".xlt",
+        ".odt",
+        ".ods",
+        ".odp",
+        ".odg",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".bz2",
+        ".7z",
+        ".rar",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".webp",
+        ".ico",
+        ".mp4",
+        ".mp3",
+        ".avi",
+        ".mov",
+        ".mkv",
+        ".webm",
+    }
+)
 
 
 class WikiJSCrawler(BaseCrawler):
@@ -157,8 +189,10 @@ class WikiJSCrawler(BaseCrawler):
                 ),
             )
             final_title = (getattr(result, "metadata", {}) or {}).get("title", "")
-            if result.success and "login" not in final_title.lower():
-                logger.info("[%s] Login succeeded (page title: %s)", self.site_config.name, final_title)
+            if result.success and "login" not in final_title.lower():  # pyright: ignore[reportAttributeAccessIssue]
+                logger.info(
+                    "[%s] Login succeeded (page title: %s)", self.site_config.name, final_title
+                )
             else:
                 logger.warning(
                     "[%s] Login may have failed (title: %r).",
@@ -211,7 +245,9 @@ class WikiJSCrawler(BaseCrawler):
                     page.url,
                 )
 
-    async def _playwright_fill_login(self, page: Any, auth: Any, username: str, password: str) -> bool:
+    async def _playwright_fill_login(
+        self, page: Any, auth: Any, username: str, password: str
+    ) -> bool:
         """Fill and submit the SSO login form using Playwright's native API.
 
         Handles WikiJS's two-stage flow: the wiki shows its own login page with
@@ -224,45 +260,45 @@ class WikiJSCrawler(BaseCrawler):
         # WikiJS shows its own /login page with provider buttons (rendered by the
         # Vue SPA after an async API call).  We wait for the network to settle,
         # then click the configured SSO button to trigger the IdP redirect.
-        if base_netloc in page.url:
-            sso_sel = auth.sso_button_selector
-            # Wait for the SPA to finish rendering before interacting.
+        sso_sel = auth.sso_button_selector
+        # Wait for the SPA to finish rendering before interacting.
+        with contextlib.suppress(Exception):
+            await page.wait_for_load_state("networkidle", timeout=10000)
+            pass  # non-fatal
+
+        if sso_sel:
+            # SSO button configured — click it to trigger the IdP redirect.
+            logger.debug(
+                "[%s] On wiki login page — clicking SSO button (%r)",
+                self.site_config.name,
+                sso_sel,
+            )
             try:
-                await page.wait_for_load_state("networkidle", timeout=10000)
+                await page.wait_for_selector(sso_sel, timeout=8000, state="visible")
+                await page.click(sso_sel)
+
+                # Wait for redirect away from the wiki domain (to the IdP).
+                def _left_wiki(url: str) -> bool:
+                    return base_netloc not in url
+
+                await page.wait_for_url(_left_wiki, timeout=15000)
+                logger.debug("[%s] Redirected to IdP: %s", self.site_config.name, page.url)
             except Exception:
-                pass  # non-fatal
-
-            if sso_sel:
-                # SSO button configured — click it to trigger the IdP redirect.
-                logger.debug(
-                    "[%s] On wiki login page — clicking SSO button (%r)",
-                    self.site_config.name, sso_sel,
-                )
-                try:
-                    await page.wait_for_selector(sso_sel, timeout=8000, state="visible")
-                    await page.click(sso_sel)
-                    # Wait for redirect away from the wiki domain (to the IdP).
-                    def _left_wiki(url: str) -> bool:
-                        return base_netloc not in url
-
-                    await page.wait_for_url(_left_wiki, timeout=15000)
-                    logger.debug(
-                        "[%s] Redirected to IdP: %s", self.site_config.name, page.url
-                    )
-                except Exception:
-                    logger.warning(
-                        "[%s] Could not click SSO button %r (URL: %s) — "
-                        "update auth.sso_button_selector in the site YAML.",
-                        self.site_config.name, sso_sel, page.url,
-                    )
-                    await self._log_page_buttons(page)
-                    return False
-            else:
-                # No SSO button — login form is already on this page.
-                logger.debug(
-                    "[%s] On wiki login page, no sso_button_selector — filling form directly",
+                logger.warning(
+                    "[%s] Could not click SSO button %r (URL: %s) — "
+                    "update auth.sso_button_selector in the site YAML.",
                     self.site_config.name,
+                    sso_sel,
+                    page.url,
                 )
+                await self._log_page_buttons(page)
+                return False
+        else:
+            # No SSO button — login form is already on this page.
+            logger.debug(
+                "[%s] On wiki login page, no sso_button_selector — filling form directly",
+                self.site_config.name,
+            )
 
         # --- Fill username field (try each comma-separated selector) --------------
         # Fill username — try each comma-separated selector in turn.
@@ -326,6 +362,7 @@ class WikiJSCrawler(BaseCrawler):
         # Using "base_netloc in url" in the second case would return immediately
         # (we're already on the wiki domain) and the /login check would fail.
         currently_on_wiki = base_netloc in page.url
+
         def _left_login(url: str) -> bool:
             return "login" not in url.lower()
 
@@ -355,8 +392,8 @@ class WikiJSCrawler(BaseCrawler):
         extra = self.site_config.extra or {}
         return CrawlerRunConfig(
             word_count_threshold=int(extra.get("word_count_threshold", 10)),
-            css_selector=extra.get("css_selector"),
-            excluded_selector=extra.get("excluded_selector"),
+            css_selector=extra.get("css_selector"),  # pyright: ignore[reportArgumentType]
+            excluded_selector=extra.get("excluded_selector"),  # pyright: ignore[reportArgumentType]
             session_id=_SESSION_ID,
             js_code=_DOM_CLEANUP_JS,
             # Give Vue a moment to finish rendering before we run the JS.
@@ -517,7 +554,9 @@ class WikiJSCrawler(BaseCrawler):
                 internal_links = result.links.get("internal", [])
                 logger.debug(
                     "[%s] BFS %s → %d internal links",
-                    self.site_config.name, url, len(internal_links),
+                    self.site_config.name,
+                    url,
+                    len(internal_links),
                 )
 
                 for link in internal_links:
@@ -548,7 +587,9 @@ class WikiJSCrawler(BaseCrawler):
 
             logger.debug(
                 "[%s] BFS depth %d → %d new URLs",
-                self.site_config.name, depth + 1, len(next_frontier),
+                self.site_config.name,
+                depth + 1,
+                len(next_frontier),
             )
             frontier = next_frontier
 
@@ -567,8 +608,12 @@ class WikiJSCrawler(BaseCrawler):
         async with AsyncWebCrawler(config=self.make_browser_config()) as crawler:
             await self.setup(crawler)
             urls = await self.discover_urls(crawler)
-            logger.info("[%s] Discovered %d pages, %d binaries",
-                        self.site_config.name, len(urls), len(self._binary_urls))
+            logger.info(
+                "[%s] Discovered %d pages, %d binaries",
+                self.site_config.name,
+                len(urls),
+                len(self._binary_urls),
+            )
 
             async def _fetch(url: str) -> None:
                 async with sem:
@@ -586,13 +631,19 @@ class WikiJSCrawler(BaseCrawler):
         # Download binary attachments outside the browser context.
         if self._binary_urls:
             if not cookies:
-                logger.warning("[%s] No session cookies — binary downloads may fail", self.site_config.name)
+                logger.warning(
+                    "[%s] No session cookies — binary downloads may fail", self.site_config.name
+                )
             await self._download_all_binaries(cookies, sem, rate.delay)
 
         manifest = self.writer.write_manifest(self.site_config)
-        logger.info("[%s] Done — %d pages, %d binaries, manifest: %s",
-                    self.site_config.name, len(self.writer._manifest),
-                    len(self._binary_urls), manifest)
+        logger.info(
+            "[%s] Done — %d pages, %d binaries, manifest: %s",
+            self.site_config.name,
+            len(self.writer._manifest),
+            len(self._binary_urls),
+            manifest,
+        )
 
     # ------------------------------------------------------------------
     # Binary download helpers
@@ -618,13 +669,17 @@ class WikiJSCrawler(BaseCrawler):
             }""")
             logger.warning(
                 "[%s] Visible buttons/links on %s — use one of these to set sso_button_selector:",
-                self.site_config.name, page.url,
+                self.site_config.name,
+                page.url,
             )
             for el in elements:
                 logger.warning(
                     "  <%s> text=%r href=%r class=%r type=%r",
-                    el.get("tag"), el.get("text"), el.get("href"),
-                    el.get("classes"), el.get("type"),
+                    el.get("tag"),
+                    el.get("text"),
+                    el.get("href"),
+                    el.get("classes"),
+                    el.get("type"),
                 )
         except Exception:
             logger.debug("Could not dump page elements", exc_info=True)
@@ -648,14 +703,19 @@ class WikiJSCrawler(BaseCrawler):
                 return out;
             }""")
             logger.warning(
-                "[%s] Input fields on %s — update username_selector / password_selector in the site YAML:",
-                self.site_config.name, page.url,
+                "[%s] Input fields on %s — update username_selector / password_selector in the site YAML:",  # noqa: E501
+                self.site_config.name,
+                page.url,
             )
             for inp in inputs:
                 logger.warning(
                     "  <input> type=%r name=%r id=%r placeholder=%r visible=%r class=%r",
-                    inp.get("type"), inp.get("name"), inp.get("id"),
-                    inp.get("placeholder"), inp.get("visible"), inp.get("classes"),
+                    inp.get("type"),
+                    inp.get("name"),
+                    inp.get("id"),
+                    inp.get("placeholder"),
+                    inp.get("visible"),
+                    inp.get("classes"),
                 )
         except Exception:
             logger.debug("Could not dump input elements", exc_info=True)
@@ -697,8 +757,11 @@ class WikiJSCrawler(BaseCrawler):
     async def _download_all_binaries(
         self, cookies: dict[str, str], sem: asyncio.Semaphore, delay: float
     ) -> None:
-        logger.info("[%s] Downloading %d binary attachments …",
-                    self.site_config.name, len(self._binary_urls))
+        logger.info(
+            "[%s] Downloading %d binary attachments …",
+            self.site_config.name,
+            len(self._binary_urls),
+        )
 
         async def _dl(url: str) -> None:
             async with sem:
@@ -761,5 +824,6 @@ class WikiJSCrawler(BaseCrawler):
 
     def _is_excluded(self, url: str) -> bool:
         import fnmatch
+
         path = urlparse(url).path
         return any(fnmatch.fnmatch(path, p) for p in self.site_config.filters.exclude_patterns)

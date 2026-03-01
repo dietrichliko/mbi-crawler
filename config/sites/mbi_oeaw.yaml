@@ -7,7 +7,8 @@ crawler_type: oeaw
 base_url: https://www.oeaw.ac.at/mbi
 
 # Full sitemap of the parent site; OEAW crawler will filter it down to MBI pages.
-sitemap_url: https://www.oeaw.ac.at/sitemap.xml
+# MBI is not indexed in the parent sitemap; use BFS link-following instead.
+sitemap_url: null
 
 filters:
   # Restrict to MBI subpath (full URL match via fnmatch).
@@ -18,7 +19,6 @@ filters:
     - "*/wp-json/*"
     - "*/feed/*"
     - "*/wp-admin/*"
-    - "*?*"           # URLs with query strings (after fnmatch, ? = one char wildcard — handled by strip_query_params below)
   strip_query_params: true
   max_depth: 10
 
@@ -29,6 +29,13 @@ rate_limit:
 output_subdir: mbi_oeaw
 
 extra:
+  # Target only the main content column; drops header nav, sidebar, footer,
+  # and the cookieman cookie-consent modal automatically.
+  css_selector: "#col-content"
+  # Strip remaining chrome inside the content column.
+  excluded_selector: "nav, .content-header, .tx-oeawtheme-sharing"
+  # Staff pages have very short content blocks (name, experiment, email).
+  word_count_threshold: 0
   # Notes for manual tuning:
   # - If oeaw.ac.at adds sitemap sub-indexes, they are followed automatically.
   # - Set include_patterns to [] to crawl the entire oeaw.ac.at (slow).

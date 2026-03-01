@@ -54,6 +54,18 @@ class BaseCrawler(ABC):
         return BrowserConfig(headless=self.app_config.headless)
 
     def make_run_config(self) -> CrawlerRunConfig:
+        extra = self.site_config.extra or {}
+        css_selector: str | None = extra.get("css_selector")
+        excluded_selector: str | None = extra.get("excluded_selector")
+        word_count_threshold: int = int(extra.get("word_count_threshold", 10))
+        return CrawlerRunConfig(
+            word_count_threshold=word_count_threshold,
+            css_selector=css_selector,
+            excluded_selector=excluded_selector,
+        )
+
+    def make_discovery_config(self) -> CrawlerRunConfig:
+        """Config for BFS link-discovery: no CSS filtering so full-page links are returned."""
         return CrawlerRunConfig(word_count_threshold=10)
 
     # ------------------------------------------------------------------
@@ -92,17 +104,24 @@ class BaseCrawler(ABC):
             logger.exception("Exception while fetching %s", url)
             return None
 
+        status = getattr(result, "status_code", None)
+        if status and status >= 400:
+            logger.warning("HTTP %d — skipping: %s", status, url)
+            return None
+
         if not result.success:
             logger.warning("Failed [%s]: %s", url, getattr(result, "error_message", ""))
             return None
 
+        return self._build_page_result(url, result)
+
+    def _build_page_result(self, url: str, result: Any) -> PageResult:
+        """Convert a crawl4ai result into a :class:`PageResult`."""
         markdown = _extract_markdown(result)
         metadata: dict[str, Any] = getattr(result, "metadata", {}) or {}
         title = metadata.get("title", "") or metadata.get("og:title", "")
-
         internal = [lnk.get("href", "") for lnk in result.links.get("internal", [])]
         external = [lnk.get("href", "") for lnk in result.links.get("external", [])]
-
         return PageResult(
             url=url,
             title=str(title),

@@ -52,6 +52,9 @@ def load_config(
             site_key = raw.get("name", site_file.stem)
             existing = sites_data.get(site_key, {})
             sites_data[site_key] = _deep_merge(existing, raw)
+            # Ensure 'extra' is a dict, not None
+            if "extra" not in sites_data[site_key] or sites_data[site_key]["extra"] is None:
+                sites_data[site_key]["extra"] = {}
             logger.debug("Loaded site config: %s from %s", site_key, site_file.name)
 
     data["sites"] = sites_data

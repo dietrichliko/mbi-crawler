@@ -1,6 +1,6 @@
-# mbi-crawler
+# MBI RAG Crawler
 
-A Python crawler that pulls pages from three sites into clean Markdown files
+A Python crawler that pulls pages from several sites into clean Markdown files
 for use in a RAG (Retrieval-Augmented Generation) system:
 
 | Site key    | Type    | URL                                                          |

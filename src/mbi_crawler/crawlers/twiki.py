@@ -2,18 +2,16 @@
 
 Discovery strategy
 ------------------
-BFS link-following from ``start_urls``, restricted to:
+Fetches ``WebTopicList`` in the configured TWiki namespace to obtain all topic
+names in a single request, then crawls each page with ``?skin=text`` for
+clean, boilerplate-free Markdown output.
 
-* Same host as the start URL.
-* URLs that match the TWiki ``/twiki/bin/view/`` path pattern.
-* The same TWiki *namespace* (web) as the start page, e.g. ``CMSPublic``.
-  This prevents the crawl from wandering into unrelated TWiki webs.
-
-Only ``/bin/view/`` action URLs are collected; edit, attach, diff, search,
-and other action paths are skipped.
-
-Query parameters are stripped from discovered URLs because TWiki uses them
-for sorting/pagination, not for unique content.
+Steps:
+1. Derive the namespace URL from the first ``start_url``, e.g.
+   ``https://twiki.cern.ch/twiki/bin/view/CMSPublic``.
+2. Fetch ``<namespace>/WebTopicList`` and extract all topic links.
+3. Filter by namespace prefix, exclude patterns, and skip non-view paths.
+4. Crawl each topic URL with ``?skin=text`` appended for clean content.
 
 No authentication required for the public CMS WorkBook.  If you need to
 crawl a protected TWiki web, add an ``auth`` block to the site config (same
@@ -26,8 +24,9 @@ import fnmatch
 import logging
 from urllib.parse import urljoin, urlparse
 
-from crawl4ai import AsyncWebCrawler  # type: ignore[import]
+from crawl4ai import AsyncWebCrawler
 
+from ..output.models import PageResult
 from .base import BaseCrawler
 
 logger = logging.getLogger(__name__)
@@ -40,78 +39,96 @@ _SKIP_ACTIONS = frozenset(
 
 
 class TWikiCrawler(BaseCrawler):
-    """BFS crawler for TWiki sites, namespace-confined."""
+    """TWiki crawler: WebTopicList discovery + ``?skin=text`` content fetch."""
 
     # ------------------------------------------------------------------
     # Discovery
     # ------------------------------------------------------------------
 
     async def discover_urls(self, crawler: AsyncWebCrawler) -> list[str]:
-        """BFS over TWiki view links, staying in one namespace."""
+        """Fetch WebTopicList to enumerate all topics without BFS."""
         start = list(self.site_config.start_urls) or [self.site_config.base_url]
         filters = self.site_config.filters
 
-        # Derive the allowed namespace prefix from the first start URL.
         ns_prefix = self._namespace_prefix(start[0])
-        base_netloc = urlparse(start[0]).netloc
-        logger.info("[%s] Namespace prefix: %s", self.site_config.name, ns_prefix)
+        parsed_start = urlparse(start[0])
+        base_netloc = parsed_start.netloc
+        base_scheme = parsed_start.scheme
 
-        discovered: set[str] = set()
-        frontier: list[str] = []
+        topic_list_url = f"{base_scheme}://{base_netloc}{ns_prefix}/WebTopicList"
+        logger.info("[%s] Fetching topic list: %s", self.site_config.name, topic_list_url)
 
-        for u in start:
-            norm = self._normalize(u)
-            if norm not in discovered:
-                discovered.add(norm)
-                frontier.append(norm)
-
-        for depth in range(filters.max_depth):
-            if not frontier:
-                break
-            next_frontier: list[str] = []
-
-            for url in frontier:
-                result = await crawler.arun(url=url, config=self.make_run_config())
-                if not result.success:
-                    continue
-
-                # TWiki pages link to both internal and external targets.
-                all_links = (
-                    result.links.get("internal", []) + result.links.get("external", [])
-                )
-                for link in all_links:
-                    href = (link.get("href") or "").strip()
-                    if not href:
-                        continue
-
-                    full = urljoin(url, href)
-                    parsed = urlparse(full)
-
-                    if parsed.netloc != base_netloc:
-                        continue
-
-                    norm = self._normalize(full)
-
-                    if not self._is_view_url(norm):
-                        continue
-                    if not parsed.path.startswith(ns_prefix):
-                        continue
-                    if self._is_excluded(norm, filters.exclude_patterns):
-                        continue
-                    if norm in discovered:
-                        continue
-
-                    discovered.add(norm)
-                    next_frontier.append(norm)
-
-            logger.debug(
-                "[%s] BFS depth %d → %d new pages",
-                self.site_config.name, depth + 1, len(next_frontier),
+        result = await crawler.arun(url=topic_list_url, config=self.make_discovery_config())
+        if not result.success:
+            logger.warning(
+                "[%s] WebTopicList fetch failed (%s) — no pages discovered",
+                self.site_config.name,
+                getattr(result, "error_message", ""),
             )
-            frontier = next_frontier
+            return []
 
-        logger.info("[%s] Discovered %d TWiki pages", self.site_config.name, len(discovered))
-        return sorted(discovered)
+        seen: set[str] = set()
+        discovered: list[str] = []
+        all_links = result.links.get("internal", []) + result.links.get("external", [])
+
+        for link in all_links:
+            href = (link.get("href") or "").strip()
+            if not href:
+                continue
+            full = urljoin(topic_list_url, href)
+            parsed = urlparse(full)
+            if parsed.netloc != base_netloc:
+                continue
+            norm = self._normalize(full)
+            if not self._is_view_url(norm):
+                continue
+            if not parsed.path.startswith(ns_prefix):
+                continue
+            if self._is_excluded(norm, filters.exclude_patterns):
+                continue
+            if norm in seen:
+                continue
+            seen.add(norm)
+            discovered.append(norm)
+
+        discovered.sort()
+        logger.info(
+            "[%s] Discovered %d TWiki pages from WebTopicList",
+            self.site_config.name, len(discovered),
+        )
+        return discovered
+
+    # ------------------------------------------------------------------
+    # Content fetch — ?skin=text strips navigation/boilerplate
+    # ------------------------------------------------------------------
+
+    async def crawl_page(
+        self, crawler: AsyncWebCrawler, url: str
+    ) -> PageResult | None:
+        """Fetch *url* with ``?skin=text`` for clean, boilerplate-free content."""
+        if url in self._visited:
+            return None
+        self._visited.add(url)
+
+        sep = "&" if "?" in url else "?"
+        fetch_url = f"{url}{sep}skin=text"
+
+        try:
+            result = await crawler.arun(url=fetch_url, config=self.make_run_config())
+        except Exception:
+            logger.exception("Exception while fetching %s", url)
+            return None
+
+        status = getattr(result, "status_code", None)
+        if status and status >= 400:
+            logger.warning("HTTP %d — skipping: %s", status, url)
+            return None
+
+        if not result.success:
+            logger.warning("Failed [%s]: %s", url, getattr(result, "error_message", ""))
+            return None
+
+        return self._build_page_result(url, result)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -119,15 +136,11 @@ class TWikiCrawler(BaseCrawler):
 
     @staticmethod
     def _namespace_prefix(url: str) -> str:
-        """Return the TWiki namespace path prefix, e.g. ``/twiki/bin/view/CMSPublic``.
-
-        If the URL is not a TWiki view URL the full path is returned as-is.
-        """
+        """Return the TWiki namespace path prefix, e.g. ``/twiki/bin/view/CMSPublic``."""
         parsed = urlparse(url)
         parts = parsed.path.split("/")
         try:
             view_idx = parts.index("view")
-            # prefix = everything up to and including the namespace segment
             if len(parts) > view_idx + 1:
                 return "/".join(parts[: view_idx + 2])
         except ValueError:
@@ -147,7 +160,6 @@ class TWikiCrawler(BaseCrawler):
         path = parsed.path
         if "/twiki/bin/view/" not in path:
             return False
-        # Reject non-view action paths embedded after the namespace.
         for action in _SKIP_ACTIONS:
             if f"/bin/{action}/" in path or path.endswith(f"/bin/{action}"):
                 return False

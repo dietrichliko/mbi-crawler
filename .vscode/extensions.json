@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    // Python
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.mypy-type-checker",
+    "charliermarsh.ruff",
+
+    // Config files used in this project
+    "redhat.vscode-yaml",
+    "tamasfe.even-better-toml",
+
+    // direnv
+    "mkhl.direnv"
+  ]
+}

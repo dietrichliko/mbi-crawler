@@ -1,6 +1,6 @@
 [project]
 name = "mbi-crawler"
-version = "0.5.3"
+version = "0.5.0"
 description = "RAG crawler for the Marietta Blau Institute (MBI/OEAW), WikiJS, and CERN TWiki sites"
 readme = "README.md"
 requires-python = ">=3.12"

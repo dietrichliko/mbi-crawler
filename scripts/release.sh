@@ -69,9 +69,7 @@ echo "  ✓ pyproject.toml  →  version = \"${VERSION}\""
 
 # ── 2. Regenerate full CHANGELOG.md ──────────────────────────────────────────
 
-uv run git-cliff --tag "${TAG}" --output CHANGELOG.md
-# Ensure trailing newline
-[ -n "$(tail -c1 CHANGELOG.md)" ] && echo >> CHANGELOG.md
+uv run git-cliff --tag "${TAG}" --output CHANGELOG.md && sed -i -e '$a\' CHANGELOG.md
 
 echo "  ✓ CHANGELOG.md updated"
 echo

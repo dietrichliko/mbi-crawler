@@ -70,7 +70,10 @@ echo "  ✓ pyproject.toml  →  version = \"${VERSION}\""
 # ── 2. Regenerate full CHANGELOG.md ──────────────────────────────────────────
 
 uv run git-cliff --tag "${TAG}" --output CHANGELOG.md
+tail -c 20 CHANGELOG.md | xxd
 echo "" >>  CHANGELOG.md
+echo "next"
+tail -c 20 CHANGELOG.md | xxd
 
 echo "  ✓ CHANGELOG.md updated"
 echo

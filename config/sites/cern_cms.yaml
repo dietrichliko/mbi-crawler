@@ -21,12 +21,15 @@ filters:
     - "*/bin/rdiff/*"
     - "*/bin/oops/*"
     - "*/bin/search/*"
-  max_depth: 4
+    # PhysicsResults and all sub-topics (e.g. PhysicsResults2024) are excluded
+    # — too many pages, unrelated to the WorkBook content.
+    - "*/CMSPublic/PhysicsResults*"
+  max_depth: 4  # unused by WebTopicList discovery; kept for config compatibility
   strip_query_params: true
 
 rate_limit:
-  delay: 2.0            # be polite to CERN servers
-  max_concurrent: 1     # single-threaded to avoid triggering rate limits
+  delay: 1.0            # be polite to CERN servers
+  max_concurrent: 2     # single-threaded to avoid triggering rate limits
 
 output_subdir: cern_cms
 

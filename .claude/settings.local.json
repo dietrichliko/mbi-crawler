@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(mbi-crawler list-sites)",
+      "Bash(uv run mbi-crawler list-sites)",
+      "Bash(uv run mbi-crawler crawl --site mbi_oeaw -v)",
+      "Bash(uv run python -c \":*)"
     ]
   }
 }

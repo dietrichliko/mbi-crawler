@@ -1,0 +1,32 @@
+{
+    "editor.formatOnSave": true,
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
+    "cSpell.words": [
+        "arun",
+        "Bearbeiten",
+        "bearbeitet",
+        "Blau",
+        "dotenv",
+        "endswith",
+        "mypy",
+        "networkidle",
+        "normalise",
+        "OEAW",
+        "pathlib",
+        "pycache",
+        "PYEOF",
+        "pyproject",
+        "regeneratable",
+        "twiki",
+        "venv",
+        "Vuetify",
+        "wikijs",
+        "Zuletzt"
+    ]
+}

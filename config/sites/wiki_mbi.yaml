@@ -12,7 +12,7 @@
 # If the login form selectors change (SSO redesign), update auth.* fields here.
 
 name: wiki_mbi
-enabled: false          # disabled by default — requires private network + credentials
+enabled: true          # disabled by default — requires private network + credentials
 crawler_type: wikijs
 base_url: https://wiki.mbi.oeaw.ac.at
 
@@ -26,10 +26,17 @@ auth:
   # Names of the keys to look up in .env (not the secrets themselves).
   username_env: WIKI_USERNAME
   password_env: WIKI_PASSWORD
-  # CSS selectors for the SSO login form (adjust if IdP changes).
-  username_selector: "input[name='email'], input[type='email'], input[id='username']"
+  # The wiki shows its own email/password form directly at /login (no separate
+  # SSO button page).  Leave sso_button_selector unset so we fill the form
+  # directly.  If the login page ever changes to show SSO provider buttons,
+  # set this to a selector that matches the button (e.g. "button.v-btn.blue").
+  # sso_button_selector: null
+  # CSS selectors for the login form.
+  username_selector: "input[type='email'], input[name='email'], input[id='username'], input[type='text']"
   password_selector: "input[type='password']"
-  submit_selector: "button[type='submit']"
+  # WikiJS renders the submit button as type='button' (not type='submit').
+  # Class 'v-btn--contained blue' identifies the primary action button.
+  submit_selector: "button.v-btn--contained.blue"
   # Substring that must appear in the URL after a successful login.
   post_login_url_pattern: "wiki.mbi.oeaw.ac.at"
 
@@ -46,7 +53,10 @@ filters:
 
 rate_limit:
   delay: 1.0
-  max_concurrent: 2
+  # Must be 1 — all page fetches share a single authenticated browser tab
+  # (session_id=wiki_session).  Two concurrent arun() calls on the same tab
+  # abort each other's navigation (net::ERR_ABORTED).
+  max_concurrent: 1
 
 output_subdir: wiki_mbi
 

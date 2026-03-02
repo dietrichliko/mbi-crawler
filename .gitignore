@@ -6,8 +6,6 @@ __pycache__/
 dist/
 build/
 
-# uv
-uv.lock
 
 # Crawler output (large, regeneratable)
 output/
@@ -22,10 +20,6 @@ output/
 # Mypy cache
 .mypy_cache/
 
-# IDE
-.vscode/
-.idea/
-*.swp
 
 # macOS
 .DS_Store

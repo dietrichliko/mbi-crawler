@@ -57,9 +57,11 @@ python3 - <<PYEOF
 import re, pathlib
 p = pathlib.Path("pyproject.toml")
 old = p.read_text()
-new = re.sub(r'^version = ".*"', f'version = "${VERSION}"', old, flags=re.MULTILINE)
-if old == new:
+if not re.search(r'^version = ".*"', old, flags=re.MULTILINE):
     raise SystemExit("Could not find 'version = ...' in pyproject.toml")
+new = re.sub(r'^version = ".*"', f'version = "${VERSION}"', old, flags=re.MULTILINE)
+if not new.endswith("\n"):
+    new += "\n"
 p.write_text(new)
 PYEOF
 
@@ -68,10 +70,29 @@ echo "  ✓ pyproject.toml  →  version = \"${VERSION}\""
 # ── 2. Regenerate full CHANGELOG.md ──────────────────────────────────────────
 
 uv run git-cliff --tag "${TAG}" --output CHANGELOG.md
+perl -pi -e 'chomp if eof' CHANGELOG.md
+tail -c 20 CHANGELOG.md | xxd
 
 echo "  ✓ CHANGELOG.md updated"
+echo
 
-# ── 3. Commit both files ──────────────────────────────────────────────────────
+# ── 3. Show the changelog entry for this release and ask for confirmation ─────
+
+echo "Changelog entry for ${TAG}:"
+echo "─────────────────────────────────────────────────────────────────────────"
+uv run git-cliff --tag "${TAG}" --unreleased --strip all
+echo "─────────────────────────────────────────────────────────────────────────"
+echo
+
+read -r -p "Does this look good? [y/N] " CONFIRM
+if [[ "${CONFIRM}" != "y" && "${CONFIRM}" != "Y" ]]; then
+    echo "Aborted. Reverting pyproject.toml and CHANGELOG.md."
+    git checkout -- pyproject.toml CHANGELOG.md
+    exit 1
+fi
+echo
+
+# ── 4. Commit both files ──────────────────────────────────────────────────────
 
 git add pyproject.toml CHANGELOG.md
 git commit --message "$(cat <<EOF
@@ -83,13 +104,17 @@ EOF
 
 echo "  ✓ release commit created"
 
-# ── 4. Annotated tag ──────────────────────────────────────────────────────────
+# ── 5. Annotated tag ──────────────────────────────────────────────────────────
 
 git tag -a "${TAG}" -m "Release ${TAG}"
 
 echo "  ✓ tag ${TAG} created"
+
+# ── 6. Push commit and tag ────────────────────────────────────────────────────
+
 echo
-echo "Review the commit and changelog, then push to trigger the release workflow:"
+git push origin main "${TAG}"
+
 echo
-echo "  git push origin main ${TAG}"
+echo "Release ${TAG} pushed. The GitHub Actions workflow will take it from here."
 echo

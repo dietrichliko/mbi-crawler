@@ -26,6 +26,10 @@ class AuthConfig(BaseModel):
     """Environment variable name holding the username/email."""
     password_env: str = "CRAWLER_PASSWORD"
     """Environment variable name holding the password."""
+    # Optional selector for an SSO provider button on the app's own login page
+    # (e.g. WikiJS shows a "Sign in with OEAW" button before redirecting to IdP).
+    # If set, this element is clicked first and we wait for the IdP page to load.
+    sso_button_selector: str | None = None
     # CSS selectors for the login form — adjust per IdP.
     username_selector: str = "input[type='email'], input[name='username']"
     password_selector: str = "input[type='password']"
